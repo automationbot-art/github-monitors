@@ -7,6 +7,9 @@ import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+PKT = ZoneInfo("Asia/Karachi")
 
 
 def _status_emoji(status: str) -> str:
@@ -42,6 +45,15 @@ def _parse_iso(value: str) -> datetime | None:
         return None
 
 
+def _format_pkt(value: str) -> str:
+    dt = _parse_iso(value)
+    if not dt:
+        return "N/A"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(PKT).strftime("%d %b %Y, %I:%M %p PKT")
+
+
 def build_summary(data: dict) -> str:
     status = data.get("status", "unknown")
     emoji = _status_emoji(status)
@@ -74,6 +86,8 @@ def build_summary(data: dict) -> str:
         f"| Trigger | `{data.get('trigger', 'N/A')}` |",
         f"| Branch | `{data.get('branch', 'N/A')}` |",
         f"| Commit SHA | `{data.get('commit_sha', 'N/A')[:12]}` |",
+        f"| Start Time (PKT) | `{_format_pkt(data.get('start_time', ''))}` |",
+        f"| End Time (PKT) | `{_format_pkt(data.get('end_time', ''))}` |",
         f"| Start Time (UTC) | `{data.get('start_time', 'N/A')}` |",
         f"| End Time (UTC) | `{data.get('end_time', 'N/A')}` |",
         f"| Duration | `{_format_duration(duration)}` |",

@@ -1,100 +1,107 @@
-# BigQuery monitoring for Looker Studio
+# BigQuery monitoring for Looker Studio (PKT)
 
-## Overview
+All schedule and run times are stored in **Pakistan Standard Time (PKT / Asia/Karachi)** alongside UTC for Looker dashboards.
 
-Every monitored workflow run inserts one row into BigQuery. Looker Studio connects to this table for cross-repo cron dashboards.
+## Primary Looker filters
 
-```
-GitHub Actions (cron repos)
-        │
-        ▼
-workflow-monitor action
-        │
-        ├── GITHUB_STEP_SUMMARY + artifact (unchanged)
-        └── INSERT → github_cron_monitoring.workflow_run_events
-                              │
-                              ▼
-                      Looker Studio dashboard
-```
+| Column | Use |
+| --- | --- |
+| `run_date_pkt` | **Main date filter** (your local calendar day) |
+| `scheduled_time_pkt_label` | Readable scheduled time in tables |
+| `dashboard_status` | Scorecard: `Ran — Success`, `Ran — Failed`, `Pending` |
+| `needs_attention` | Boolean filter for action queue |
+| `operator_instruction` | What to do next — show in detail tables |
+| `severity` | Color coding: `success`, `warning`, `error`, `info` |
 
-## Dataset and table
-
-| Resource | ID | Description |
-| --- | --- | --- |
-| Dataset | `github_cron_monitoring` | Scheduled GitHub Actions monitoring across automationbot-art repos |
-| Table | `workflow_run_events` | One row per monitored job execution |
-
-**Full table ID:** `combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events`
-
-Partitioned by `run_date`, clustered by `repository_name`, `workflow_outcome`, `execution_status`.
-
-## Column reference
+## Schedule columns (PKT)
 
 | Column | Type | Description |
 | --- | --- | --- |
-| `event_id` | STRING | Unique row UUID |
-| `recorded_at` | TIMESTAMP | When the row was written |
-| `run_date` | DATE | Run date (UTC) — primary Looker date filter |
-| `repository_name` | STRING | `org/repo` |
-| `repository_short_name` | STRING | Repo name only |
-| `workflow_name` | STRING | Workflow display name |
-| `job_name` | STRING | Job name within workflow |
-| `branch` | STRING | Git branch |
-| `commit_sha` | STRING | Commit SHA |
-| `trigger_type` | STRING | `schedule`, `workflow_dispatch`, etc. |
-| `scheduled_cron` | STRING | Cron expression |
-| `scheduled_time_utc` | TIMESTAMP | Scheduled/actual start (UTC) |
-| `started_at` | TIMESTAMP | Job start |
-| `ended_at` | TIMESTAMP | Job end |
-| `duration_seconds` | INT64 | Duration |
-| `execution_status` | STRING | `Ran` (executed) or `Pending` (future sync) |
-| `workflow_outcome` | STRING | `success`, `failure`, `cancelled` |
-| `remarks` | STRING | Human summary for Looker tables |
-| `error_message` | STRING | Parsed error text |
-| `error_type` | STRING | Error classification |
-| `failed_step` | STRING | Failed Actions step name |
-| `action_required` | STRING | Recommended fix |
-| `records_processed` | INT64 | Rows/records from cron script |
-| `warnings` | STRING | Warning text |
-| `has_warnings` | BOOL | True if warnings on success |
-| `github_run_id` | STRING | Actions run ID |
-| `github_run_number` | INT64 | Run number |
-| `github_run_attempt` | INT64 | Re-run attempt |
-| `run_url` | STRING | Link to GitHub run |
-| `artifact_url` | STRING | Link to summary artifact |
-| `log_excerpt` | STRING | Truncated log tail |
-| `ingestion_source` | STRING | `github-actions-workflow-monitor` |
+| `timezone` | STRING | `Asia/Karachi` |
+| `timezone_label` | STRING | `PKT` |
+| `run_date_pkt` | DATE | Run date in PKT |
+| `scheduled_time_pkt` | DATETIME | Scheduled start wall clock (PKT) |
+| `scheduled_time_pkt_label` | STRING | e.g. `30 Jun 2026, 11:00 AM PKT` |
+| `started_at_pkt` | DATETIME | Actual start (PKT) |
+| `ended_at_pkt` | DATETIME | Actual end (PKT) |
+| `day_of_week_pkt` | STRING | Monday, Tuesday, … |
+| `hour_of_day_pkt` | INT64 | 0–23 for heatmaps |
+| `cron_description_pkt` | STRING | e.g. `Daily at 11:00 AM PKT` |
+| `scheduled_cron` | STRING | Raw cron (UTC on GitHub) |
 
-## Setup
+> GitHub cron is always UTC. `cron 0 6 * * *` = **11:00 AM PKT**.
 
-### 1. Credentials
+## Operator / instruction columns
 
-Local: copy `config/livestore.json.example` → `config/livestore.json` (gitignored).
+| Column | When populated | Example |
+| --- | --- | --- |
+| `operator_instruction` | Every run | `No action needed — monitor the next scheduled run.` |
+| `action_required` | Failures | `Add the missing secret or repository variable…` |
+| `remarks` | Every run | `Failed — ValueError: missing TABLE` |
+| `needs_attention` | Failures, warnings, late, 0 records | `true` / `false` |
+| `severity` | Every run | `error`, `warning`, `success` |
+| `is_late_run` | Scheduled runs | `true` if started >15 min late |
+| `delay_minutes` | Scheduled runs | Minutes after expected cron time |
+| `dashboard_status` | Every run | `Ran — Success` |
 
-GitHub: org secret **`LIVESTORE_SA_JSON`** with the full JSON content.
+### `operator_instruction` logic
 
-Service account needs:
+| Situation | Instruction |
+| --- | --- |
+| Success | No action needed — monitor the next scheduled run. |
+| Success + warnings | Review warnings and confirm data quality. |
+| Success + 0 records | Verify source data and script filters. |
+| Late run | Check Actions queue or runner availability. |
+| Failure | Uses `action_required` or parsed error message. |
+| Cancelled | Re-trigger manually if still needed. |
 
-- `bigquery.datasets.create` (setup only)
-- `bigquery.tables.create` (setup only)
-- `bigquery.tables.updateData` (insert rows)
+## Core columns (unchanged)
 
-### 2. Create dataset + table
+| Column | Description |
+| --- | --- |
+| `repository_name` | `org/repo` |
+| `workflow_name` | Workflow name |
+| `execution_status` | `Ran` or `Pending` (future) |
+| `workflow_outcome` | `success`, `failure`, `cancelled` |
+| `records_processed` | Row count from cron script |
+| `error_message` | Parsed error |
+| `run_url` | GitHub Actions link |
+
+## Looker Studio chart ideas
+
+1. **Today's attention queue** — filter `needs_attention = true` AND `run_date_pkt = today`
+2. **Success rate by repo** — `dashboard_status` breakdown
+3. **Runs by hour (PKT)** — `hour_of_day_pkt` bar chart
+4. **Late runs** — `is_late_run = true` table with `delay_minutes`
+5. **Instruction table** — `repository_name`, `scheduled_time_pkt_label`, `operator_instruction`, `run_url`
+
+## Example query (PKT)
+
+```sql
+SELECT
+  run_date_pkt,
+  scheduled_time_pkt_label,
+  repository_name,
+  workflow_name,
+  dashboard_status,
+  cron_description_pkt,
+  remarks,
+  operator_instruction,
+  severity,
+  needs_attention,
+  records_processed,
+  run_url
+FROM `combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events`
+WHERE run_date_pkt >= DATE_SUB(CURRENT_DATE('Asia/Karachi'), INTERVAL 14 DAY)
+ORDER BY started_at_pkt DESC
+```
+
+## Schema updates
+
+After pulling latest code:
 
 ```bash
-pip install -r requirements.txt
 python scripts/setup_bigquery.py
 ```
 
-Or run GitHub workflow **Setup BigQuery Monitoring**.
-
-### 3. Connect Looker Studio
-
-1. Looker Studio → **Create** → **BigQuery** connector
-2. Select project `combine-data-pipeline-482809`
-3. Table `github_cron_monitoring.workflow_run_events`
-4. Build charts: failures by repo, daily success rate, remarks table, records processed
-
-## Slack (disabled)
-
-Slack notification steps are commented out in the composite action. Re-enable when ready.
+This adds new PKT and instruction columns to the existing table.

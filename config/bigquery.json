@@ -5,5 +5,8 @@
   "table_id": "workflow_run_events",
   "table_description": "One row per monitored workflow job execution. Tracks schedule adherence, outcomes, errors, and row counts for Looker Studio reporting.",
   "location": "US",
+  "timezone": "Asia/Karachi",
+  "timezone_label": "PKT",
+  "late_run_threshold_minutes": 15,
   "credentials_file": "config/livestore.json"
 }

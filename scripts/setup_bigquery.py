@@ -41,7 +41,25 @@ def table_schema() -> list[bigquery.SchemaField]:
             "run_date",
             "DATE",
             mode="REQUIRED",
-            description="Calendar date of the workflow run (UTC). Primary Looker filter.",
+            description="Calendar date of the workflow run (UTC).",
+        ),
+        bigquery.SchemaField(
+            "run_date_pkt",
+            "DATE",
+            mode="NULLABLE",
+            description="Calendar date in Pakistan Standard Time (PKT) — primary Looker date filter.",
+        ),
+        bigquery.SchemaField(
+            "timezone",
+            "STRING",
+            mode="NULLABLE",
+            description="IANA timezone used for local schedule display (Asia/Karachi).",
+        ),
+        bigquery.SchemaField(
+            "timezone_label",
+            "STRING",
+            mode="NULLABLE",
+            description="Short timezone label shown on dashboards (PKT).",
         ),
         bigquery.SchemaField(
             "repository_name",
@@ -89,13 +107,37 @@ def table_schema() -> list[bigquery.SchemaField]:
             "scheduled_cron",
             "STRING",
             mode="NULLABLE",
-            description="Cron expression when triggered by schedule.",
+            description="Cron expression when triggered by schedule (GitHub uses UTC).",
+        ),
+        bigquery.SchemaField(
+            "cron_description_pkt",
+            "STRING",
+            mode="NULLABLE",
+            description="Human-readable schedule in PKT, e.g. Daily at 11:00 AM PKT.",
         ),
         bigquery.SchemaField(
             "scheduled_time_utc",
             "TIMESTAMP",
             mode="NULLABLE",
-            description="Expected or actual scheduled start time in UTC.",
+            description="Scheduled or actual start time in UTC.",
+        ),
+        bigquery.SchemaField(
+            "expected_run_time_utc",
+            "TIMESTAMP",
+            mode="NULLABLE",
+            description="Expected cron trigger time in UTC for delay calculation.",
+        ),
+        bigquery.SchemaField(
+            "scheduled_time_pkt",
+            "DATETIME",
+            mode="NULLABLE",
+            description="Scheduled start wall-clock time in PKT.",
+        ),
+        bigquery.SchemaField(
+            "scheduled_time_pkt_label",
+            "STRING",
+            mode="NULLABLE",
+            description="Formatted scheduled time for Looker tables, e.g. 30 Jun 2026, 11:00 AM PKT.",
         ),
         bigquery.SchemaField(
             "started_at",
@@ -104,10 +146,34 @@ def table_schema() -> list[bigquery.SchemaField]:
             description="Workflow job start time (UTC).",
         ),
         bigquery.SchemaField(
+            "started_at_pkt",
+            "DATETIME",
+            mode="NULLABLE",
+            description="Workflow job start wall-clock time in PKT.",
+        ),
+        bigquery.SchemaField(
             "ended_at",
             "TIMESTAMP",
             mode="NULLABLE",
             description="Workflow job end time (UTC).",
+        ),
+        bigquery.SchemaField(
+            "ended_at_pkt",
+            "DATETIME",
+            mode="NULLABLE",
+            description="Workflow job end wall-clock time in PKT.",
+        ),
+        bigquery.SchemaField(
+            "day_of_week_pkt",
+            "STRING",
+            mode="NULLABLE",
+            description="Day name in PKT for weekly Looker breakdowns.",
+        ),
+        bigquery.SchemaField(
+            "hour_of_day_pkt",
+            "INT64",
+            mode="NULLABLE",
+            description="Hour 0-23 in PKT for heatmaps and peak-time charts.",
         ),
         bigquery.SchemaField(
             "duration_seconds",
@@ -116,10 +182,28 @@ def table_schema() -> list[bigquery.SchemaField]:
             description="Job duration in seconds.",
         ),
         bigquery.SchemaField(
+            "is_late_run",
+            "BOOL",
+            mode="NULLABLE",
+            description="True when the job started more than 15 minutes after expected cron time.",
+        ),
+        bigquery.SchemaField(
+            "delay_minutes",
+            "INT64",
+            mode="NULLABLE",
+            description="Minutes after expected schedule time the job actually started.",
+        ),
+        bigquery.SchemaField(
             "execution_status",
             "STRING",
             mode="REQUIRED",
             description="Ran = job executed; Pending = expected but not yet observed (future sync).",
+        ),
+        bigquery.SchemaField(
+            "dashboard_status",
+            "STRING",
+            mode="NULLABLE",
+            description="Combined status for Looker scorecards: Ran — Success, Ran — Failed, Pending.",
         ),
         bigquery.SchemaField(
             "workflow_outcome",
@@ -156,6 +240,24 @@ def table_schema() -> list[bigquery.SchemaField]:
             "STRING",
             mode="NULLABLE",
             description="Recommended remediation for operators.",
+        ),
+        bigquery.SchemaField(
+            "operator_instruction",
+            "STRING",
+            mode="NULLABLE",
+            description="Short actionable instruction for Looker dashboard operators.",
+        ),
+        bigquery.SchemaField(
+            "severity",
+            "STRING",
+            mode="NULLABLE",
+            description="Dashboard severity: success, warning, error, info.",
+        ),
+        bigquery.SchemaField(
+            "needs_attention",
+            "BOOL",
+            mode="NULLABLE",
+            description="True for failures, warnings, late runs, or zero records processed.",
         ),
         bigquery.SchemaField(
             "records_processed",
@@ -237,15 +339,38 @@ def ensure_table(
     description: str,
 ) -> None:
     table_ref = f"{project_id}.{dataset_id}.{table_id}"
-    table = bigquery.Table(table_ref, schema=table_schema())
-    table.description = description
-    table.time_partitioning = bigquery.TimePartitioning(
-        type_=bigquery.TimePartitioningType.DAY,
-        field="run_date",
-    )
-    table.clustering_fields = ["repository_name", "workflow_outcome", "execution_status"]
-    client.create_table(table, exists_ok=True)
-    print(f"Table ready: {table_ref}")
+    desired_schema = table_schema()
+
+    try:
+        existing = client.get_table(table_ref)
+        merged = list(existing.schema)
+        existing_names = {field.name for field in merged}
+        added = 0
+        for field in desired_schema:
+            if field.name not in existing_names:
+                merged.append(field)
+                added += 1
+        if added:
+            existing.schema = merged
+            client.update_table(existing, ["schema"])
+            print(f"Table schema updated: {table_ref} (+{added} columns)")
+        else:
+            print(f"Table ready: {table_ref}")
+    except Exception:
+        table = bigquery.Table(table_ref, schema=desired_schema)
+        table.description = description
+        table.time_partitioning = bigquery.TimePartitioning(
+            type_=bigquery.TimePartitioningType.DAY,
+            field="run_date",
+        )
+        table.clustering_fields = [
+            "repository_name",
+            "workflow_outcome",
+            "needs_attention",
+            "run_date_pkt",
+        ]
+        client.create_table(table)
+        print(f"Table created: {table_ref}")
 
 
 def main() -> int:

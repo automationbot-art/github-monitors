@@ -28,21 +28,21 @@ python scripts/setup_bigquery.py --config config/bigquery.json --credentials con
 
 Run workflow **Setup BigQuery Monitoring** (requires `LIVESTORE_SA_JSON` secret).
 
-## Key columns for Looker Studio
+## Key columns for Looker Studio (PKT)
 
 | Column | Use in dashboard |
 | --- | --- |
-| `run_date` | Date filter, time series |
-| `repository_name` | Repo breakdown |
-| `workflow_name` | Workflow filter |
-| `scheduled_time_utc` | Schedule adherence |
-| `execution_status` | Ran vs Pending (future sync) |
-| `workflow_outcome` | success / failure / cancelled |
-| `remarks` | Human-readable status for tables |
-| `error_message` | Failure detail cards |
-| `records_processed` | Volume metrics |
-| `has_warnings` | Warning filter |
-| `run_url` | Drill-through link |
+| `run_date_pkt` | **Primary date filter** (Pakistan time) |
+| `scheduled_time_pkt_label` | Readable schedule time in tables |
+| `cron_description_pkt` | e.g. Daily at 11:00 AM PKT |
+| `dashboard_status` | Ran — Success / Ran — Failed / Pending |
+| `operator_instruction` | Actionable next step for operators |
+| `needs_attention` | Filter attention queue |
+| `severity` | success / warning / error / info |
+| `is_late_run` | Late schedule detection |
+| `hour_of_day_pkt` | PKT heatmap by hour |
+| `remarks` | Human-readable outcome |
+| `run_url` | Drill-through to GitHub |
 
 ## Remarks values
 
@@ -58,16 +58,17 @@ Run workflow **Setup BigQuery Monitoring** (requires `LIVESTORE_SA_JSON` secret)
 
 ```sql
 SELECT
-  run_date,
+  run_date_pkt,
+  scheduled_time_pkt_label,
   repository_name,
   workflow_name,
-  scheduled_time_utc,
-  execution_status,
-  workflow_outcome,
-  remarks,
+  dashboard_status,
+  operator_instruction,
+  severity,
+  needs_attention,
   records_processed,
   run_url
 FROM `combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events`
-WHERE run_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
-ORDER BY recorded_at DESC
+WHERE run_date_pkt >= DATE_SUB(CURRENT_DATE('Asia/Karachi'), INTERVAL 30 DAY)
+ORDER BY started_at_pkt DESC
 ```
