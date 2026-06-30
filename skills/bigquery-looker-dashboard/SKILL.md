@@ -1,9 +1,17 @@
 ---
 name: bigquery-looker-dashboard
-description: Provision and query the github_cron_monitoring BigQuery dataset for Looker Studio dashboards. Use when setting up tables, running setup_bigquery.py, or connecting Looker to workflow run data.
+description: Query the SINGLE central BigQuery table for Looker Studio. setup_bigquery.py runs ONLY in automationbot-art/github-monitor — never in cron repos.
 ---
 
 # BigQuery + Looker Studio Monitoring
+
+## ⛔ One table for all repos
+
+```
+combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events
+```
+
+Cron repos **do not** create tables. They only call the monitor action which **inserts rows** into this table.
 
 ## Resources
 
@@ -12,12 +20,11 @@ description: Provision and query the github_cron_monitoring BigQuery dataset for
 | GCP project | `combine-data-pipeline-482809` |
 | Dataset | `github_cron_monitoring` |
 | Table | `workflow_run_events` |
-| Credentials (local) | `config/livestore.json` |
-| Config (no secrets) | `config/bigquery.json` |
+| Looker filter | `repository_name` column |
 
-## Provision dataset + table
+## Provision dataset + table (github-monitor repo ONLY)
 
-### Locally
+Run **only** in `automationbot-art/github-monitor` — never in cron repos:
 
 ```bash
 pip install -r requirements.txt

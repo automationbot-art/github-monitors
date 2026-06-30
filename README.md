@@ -1,31 +1,32 @@
 # github-monitor
 
-Reusable GitHub Actions monitoring for scheduled cron workflows. **BigQuery + Looker Studio** — Slack disabled for now.
+Central monitoring for **all** automationbot-art cron repos.
+
+## Where data lives (one place)
+
+```
+combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events
+```
+
+| | |
+|---|---|
+| **All repos** | Insert rows into this **one table** |
+| **Looker Studio** | Connect to this table, filter by `repository_name` |
+| **Cron repos** | YAML changes only — **no** local BigQuery setup |
+
+## Cron repo integration
+
+**[docs/INTEGRATE-EVERY-REPO.md](docs/INTEGRATE-EVERY-REPO.md)** — what to paste in each repo
+
+**[docs/DO-NOT-CREATE-TABLES.md](docs/DO-NOT-CREATE-TABLES.md)** — stop per-repo table creation
+
+## Org secret (once)
+
+`LIVESTORE_SA_JSON` on **automationbot-art** org
+
+## Docs
+
+- [docs/bigquery.md](docs/bigquery.md) — columns (PKT, manual/scheduled)
+- [skills/](skills/) — Cursor agent skills
 
 **Repo:** [automationbot-art/github-monitor](https://github.com/automationbot-art/github-monitor)
-
-## Documentation
-
-- **[docs/INTEGRATE-EVERY-REPO.md](docs/INTEGRATE-EVERY-REPO.md)** — what to paste in every cron repo
-- [docs/setup.md](docs/setup.md) — overview
-- [docs/bigquery.md](docs/bigquery.md) — Looker columns (PKT + manual/scheduled)
-
-## BigQuery target
-
-`combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events`
-
-## Org secret (one place)
-
-`LIVESTORE_SA_JSON` — GCP service account JSON for all cron repos
-
-## Components
-
-| Component | Purpose |
-| --- | --- |
-| `.github/actions/workflow-monitor` | Summary, artifact, BigQuery insert |
-| `scripts/setup_bigquery.py` | Create dataset + table |
-| `skills/github-workflow-monitor` | Roll out monitor to cron repos |
-
-## License
-
-MIT

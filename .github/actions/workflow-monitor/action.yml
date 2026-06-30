@@ -1,7 +1,8 @@
 name: Workflow Monitor
 description: >
-  Generate a Markdown job summary, save media/workflow-summary.md, upload the
-  workflow-summary artifact, and record run metadata in BigQuery for Looker Studio.
+  Inserts one row into the CENTRAL BigQuery table
+  combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events
+  (shared by all repos — no per-repo tables). Also writes job summary + artifact.
 branding:
   icon: graph
   color: blue

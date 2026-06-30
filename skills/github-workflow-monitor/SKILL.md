@@ -1,37 +1,48 @@
 ---
 name: github-workflow-monitor
-description: Integrate automationbot-art/github-monitor into cron workflow YAML. Use when rolling out BigQuery monitoring. Never uncomment or change commented schedule lines.
+description: Integrate automationbot-art/github-monitor into cron workflow YAML ONLY. All repos write to ONE central BigQuery table. Never create per-repo tables or copy setup scripts.
 ---
 
 # GitHub Workflow Monitor Integration
 
-## Critical rule
+## ⛔ ONE central table — not per repo
 
-**Do NOT change schedule/cron configuration.**
+```
+combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events
+```
 
-- If `schedule:` is commented out → leave it commented
-- If only `workflow_dispatch` is active → leave it as manual-only
-- Only add log capture + monitor steps
+Every repository inserts **rows** here. Use column `repository_name` to filter by repo in Looker.
+
+**Never** in cron repos:
+- Create BigQuery datasets/tables
+- Copy `setup_bigquery.py` or `config/bigquery.json`
+- Add BigQuery setup workflows
+
+Only edit `.github/workflows/*.yml`.
 
 ## Org secret (once)
 
-`LIVESTORE_SA_JSON` on **automationbot-art** org — not per repo.
+`LIVESTORE_SA_JSON` on **automationbot-art** org.
 
-## Change 1 — Run step
+## Do not change schedule
+
+Leave commented cron and `workflow_dispatch` exactly as they are.
+
+## YAML changes only
+
+### Run step
 
 ```yaml
-- name: <keep original name>
+- name: <keep name>
   id: cron
   run: |
     set -o pipefail
-    python your_script.py 2>&1 | tee "${RUNNER_TEMP}/cron-output.log"
+    python script.py 2>&1 | tee "${RUNNER_TEMP}/cron-output.log"
     ROWS="$(grep -oE 'rows~=[0-9]+' "${RUNNER_TEMP}/cron-output.log" | tail -1 | cut -d= -f2 || true)"
     echo "records-processed=${ROWS:-0}" >> "$GITHUB_OUTPUT"
 ```
 
-## Change 2 — Monitor step
-
-**Manual-only repo** (schedule commented/disabled):
+### Monitor step (inserts into central table)
 
 ```yaml
 - name: Workflow monitor
@@ -46,8 +57,8 @@ description: Integrate automationbot-art/github-monitor into cron workflow YAML.
     schedule-status: manual-only
 ```
 
-**Active cron repo** — same but omit `schedule-status`.
+Omit `schedule-status` if repo has active cron. Omit entire monitor block duplication — one monitor per run step.
 
-## Full paste guide
+## Full guide
 
-See `docs/INTEGRATE-EVERY-REPO.md`.
+`docs/INTEGRATE-EVERY-REPO.md` and `docs/DO-NOT-CREATE-TABLES.md`
