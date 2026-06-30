@@ -131,6 +131,40 @@ def severity(outcome: str, has_warnings: bool) -> str:
     return "info"
 
 
+def trigger_metadata(trigger_type: str, schedule_status_input: str = "") -> dict:
+    """Classify how the workflow was triggered for Looker dashboards."""
+    trigger = (trigger_type or "").strip().lower()
+    schedule_input = (schedule_status_input or "").strip().lower()
+
+    if trigger == "workflow_dispatch":
+        return {
+            "run_mode": "Manual",
+            "trigger_type_label": "Manual Run",
+            "is_manual_run": True,
+            "is_scheduled_run": False,
+            "schedule_status": "Disabled (manual only)"
+            if schedule_input in {"disabled", "manual-only", "manual_only", "commented"}
+            else "Manual trigger",
+        }
+
+    if trigger == "schedule":
+        return {
+            "run_mode": "Scheduled",
+            "trigger_type_label": "Scheduled Cron",
+            "is_manual_run": False,
+            "is_scheduled_run": True,
+            "schedule_status": "Active",
+        }
+
+    return {
+        "run_mode": "Other",
+        "trigger_type_label": trigger.replace("_", " ").title() if trigger else "Unknown",
+        "is_manual_run": False,
+        "is_scheduled_run": False,
+        "schedule_status": schedule_input or "Not configured",
+    }
+
+
 def operator_instruction(
     outcome: str,
     has_warnings: bool,
@@ -138,6 +172,7 @@ def operator_instruction(
     action_required: str | None,
     error_message: str | None,
     records_processed: int | None,
+    is_manual_run: bool = False,
 ) -> str:
     outcome = (outcome or "").lower()
     action_required = (action_required or "").strip()
@@ -160,6 +195,8 @@ def operator_instruction(
         return "Run succeeded but processed 0 records — verify source data and script filters."
 
     if outcome == "success":
+        if is_manual_run:
+            return "No action needed — manual run completed successfully."
         return "No action needed — monitor the next scheduled run."
 
     if outcome in {"cancelled", "canceled"}:
@@ -186,16 +223,51 @@ def needs_attention(
     return False
 
 
-def dashboard_status_label(outcome: str, execution_status: str) -> str:
-    """Looker-friendly status: Ran / Pending paired with outcome."""
+def build_remarks(
+    outcome: str,
+    warnings: str,
+    error_message: str,
+    is_manual_run: bool = False,
+) -> str:
+    warnings = (warnings or "").strip()
+    error_message = (error_message or "").strip()
+    outcome = (outcome or "unknown").lower()
+    prefix = "Manual run — " if is_manual_run else ""
+
+    if outcome == "success":
+        if warnings and warnings.lower() not in {"none", "n/a"}:
+            return f"{prefix}Successful with warnings: {warnings}"
+        return f"{prefix}Successful — completed without errors"
+
+    if outcome == "failure":
+        if error_message and error_message.lower() != "none":
+            return f"{prefix}Failed — {error_message}"
+        return f"{prefix}Failed — see workflow logs for details"
+
+    if outcome == "cancelled":
+        return f"{prefix}Cancelled — workflow run was cancelled"
+
+    if outcome == "skipped":
+        return f"{prefix}Skipped — job did not execute"
+
+    return f"{prefix}Completed with outcome: {outcome}"
+
+
+def dashboard_status_label(outcome: str, execution_status: str, run_mode: str = "Scheduled") -> str:
+    """Looker-friendly status: Ran / Pending paired with outcome and run mode."""
     execution_status = execution_status or "Ran"
     outcome = (outcome or "unknown").lower()
+    mode = run_mode or "Scheduled"
+
     if execution_status == "Pending":
         return "Pending"
+
+    prefix = "Manual — " if mode == "Manual" else "Ran — "
+
     if outcome == "success":
-        return "Ran — Success"
+        return f"{prefix}Success"
     if outcome == "failure":
-        return "Ran — Failed"
+        return f"{prefix}Failed"
     if outcome in {"cancelled", "canceled"}:
-        return "Ran — Cancelled"
-    return f"Ran — {outcome.title()}"
+        return f"{prefix}Cancelled"
+    return f"{prefix}{outcome.title()}"

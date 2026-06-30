@@ -1,34 +1,26 @@
 ---
 name: github-workflow-monitor
-description: Integrate the automationbot-art/github-monitor composite action into cron workflow YAML files. Use when adding BigQuery monitoring, job summaries, or rolling out the monitor across repositories.
+description: Integrate automationbot-art/github-monitor into cron workflow YAML. Use when rolling out BigQuery monitoring. Never uncomment or change commented schedule lines.
 ---
 
 # GitHub Workflow Monitor Integration
 
-## When to use
+## Critical rule
 
-- Adding monitoring to a scheduled/cron GitHub Actions workflow
-- Rolling out `workflow-monitor` across multiple repositories
-- Updating consumer repos after monitor action API changes
+**Do NOT change schedule/cron configuration.**
 
-## Action reference
+- If `schedule:` is commented out → leave it commented
+- If only `workflow_dispatch` is active → leave it as manual-only
+- Only add log capture + monitor steps
 
-```
-automationbot-art/github-monitor/.github/actions/workflow-monitor@main
-```
+## Org secret (once)
 
-## Required org secret
+`LIVESTORE_SA_JSON` on **automationbot-art** org — not per repo.
 
-| Secret | Value |
-| --- | --- |
-| `LIVESTORE_SA_JSON` | Full GCP service account JSON (same as `config/livestore.json`) |
-
-## Integration pattern
-
-### Change 1 — Run step (log capture)
+## Change 1 — Run step
 
 ```yaml
-- name: <keep original step name>
+- name: <keep original name>
   id: cron
   run: |
     set -o pipefail
@@ -37,7 +29,9 @@ automationbot-art/github-monitor/.github/actions/workflow-monitor@main
     echo "records-processed=${ROWS:-0}" >> "$GITHUB_OUTPUT"
 ```
 
-### Change 2 — Monitor step (after run step, same job)
+## Change 2 — Monitor step
+
+**Manual-only repo** (schedule commented/disabled):
 
 ```yaml
 - name: Workflow monitor
@@ -46,21 +40,14 @@ automationbot-art/github-monitor/.github/actions/workflow-monitor@main
   with:
     gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
     workflow-status: ${{ steps.cron.outcome }}
-    failed-step: <exact run step name>
+    failed-step: <exact step name>
     log-file: ${{ runner.temp }}/cron-output.log
     records-processed: ${{ steps.cron.outputs.records-processed }}
+    schedule-status: manual-only
 ```
 
-## Matrix workflows
+**Active cron repo** — same but omit `schedule-status`.
 
-Add both changes **per job** (rankings, launches, etc.). `id: cron` can repeat across separate jobs.
+## Full paste guide
 
-## Do not change
-
-- Schedule/cron triggers
-- Matrix dimensions
-- Unrelated setup steps
-
-## Slack
-
-Slack notifications are **disabled** in the action. Do not add `SLACK_WEBHOOK_URL` unless re-enabling commented steps in the action.
+See `docs/INTEGRATE-EVERY-REPO.md`.

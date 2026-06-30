@@ -2,6 +2,20 @@
 
 All schedule and run times are stored in **Pakistan Standard Time (PKT / Asia/Karachi)** alongside UTC for Looker dashboards.
 
+## Run mode columns (manual vs scheduled)
+
+| Column | Manual run | Scheduled run |
+| --- | --- | --- |
+| `run_mode` | `Manual` | `Scheduled` |
+| `trigger_type_label` | `Manual Run` | `Scheduled Cron` |
+| `schedule_status` | `Disabled (manual only)` | `Active` |
+| `is_manual_run` | `true` | `false` |
+| `is_scheduled_run` | `false` | `true` |
+| `dashboard_status` | `Manual — Success` | `Ran — Success` |
+| `remarks` | `Manual run — Successful…` | `Successful…` |
+
+Set `schedule-status: manual-only` in the monitor step when cron is commented/disabled in YAML.
+
 ## Primary Looker filters
 
 | Column | Use |

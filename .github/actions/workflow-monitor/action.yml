@@ -37,6 +37,12 @@ inputs:
     description: Cron expression for scheduled workflows (auto-detected when empty)
     required: false
     default: ""
+  schedule-status:
+    description: >
+      Set to manual-only when cron schedule lines are commented/disabled in YAML.
+      Leave empty for auto-detection from trigger type.
+    required: false
+    default: ""
   artifact-retention-days:
     description: Artifact retention in days
     required: false
@@ -205,6 +211,7 @@ runs:
         RUN_URL: ${{ steps.context.outputs.run-url }}
         ARTIFACT_URL: ${{ steps.context.outputs.artifact-url }}
         SCHEDULED_CRON: ${{ inputs.scheduled-cron || github.event.schedule }}
+        SCHEDULE_STATUS: ${{ inputs.schedule-status }}
         SCHEDULED_TIME_UTC: ${{ steps.context.outputs.start-time }}
         GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/workflow-monitor/gcp-sa.json
       run: |

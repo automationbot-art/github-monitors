@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from bq_enrichment import (
     PKT_LABEL,
+    build_remarks,
     compute_delay,
     cron_description_pkt,
     dashboard_status_label,
@@ -23,6 +24,7 @@ from bq_enrichment import (
     pkt_datetime_value,
     pkt_label,
     severity,
+    trigger_metadata,
 )
 
 
@@ -41,30 +43,6 @@ def _to_int(value: str | None) -> int | None:
         return int(value)
     except ValueError:
         return None
-
-
-def _build_remarks(outcome: str, warnings: str, error_message: str) -> str:
-    warnings = (warnings or "").strip()
-    error_message = (error_message or "").strip()
-    outcome = (outcome or "unknown").lower()
-
-    if outcome == "success":
-        if warnings and warnings.lower() not in {"none", "n/a"}:
-            return f"Successful with warnings: {warnings}"
-        return "Successful — completed without errors"
-
-    if outcome == "failure":
-        if error_message and error_message.lower() != "none":
-            return f"Failed — {error_message}"
-        return "Failed — see workflow logs for details"
-
-    if outcome == "cancelled":
-        return "Cancelled — workflow run was cancelled"
-
-    if outcome == "skipped":
-        return "Skipped — job did not execute"
-
-    return f"Completed with outcome: {outcome}"
 
 
 def _read_log_excerpt(log_file: str | None, limit: int = 4000) -> str | None:
@@ -88,6 +66,9 @@ def build_row() -> dict:
     end_time = os.environ.get("END_TIME", "")
     scheduled_cron = os.environ.get("SCHEDULED_CRON", "") or None
     trigger_type = os.environ.get("GITHUB_EVENT_NAME", "")
+    schedule_status_input = os.environ.get("SCHEDULE_STATUS", "")
+
+    trigger = trigger_metadata(trigger_type, schedule_status_input)
 
     start_dt = parse_ts(start_time) or now
     end_dt = parse_ts(end_time)
@@ -100,12 +81,19 @@ def build_row() -> dict:
         and outcome.lower() == "success"
     )
 
-    expected_utc = expected_run_utc(scheduled_cron, start_dt) if trigger_type == "schedule" else None
+    is_scheduled = trigger["is_scheduled_run"]
+    expected_utc = expected_run_utc(scheduled_cron, start_dt) if is_scheduled else None
     is_late_run, delay_minutes = compute_delay(start_dt, expected_utc)
     execution_status = "Ran"
     sev = severity(outcome, has_warnings)
     instruction = operator_instruction(
-        outcome, has_warnings, is_late_run, action_required, error_message, records_processed
+        outcome,
+        has_warnings,
+        is_late_run,
+        action_required,
+        error_message,
+        records_processed,
+        is_manual_run=trigger["is_manual_run"],
     )
     attention = needs_attention(outcome, has_warnings, is_late_run, records_processed)
 
@@ -123,8 +111,13 @@ def build_row() -> dict:
         "branch": os.environ.get("GITHUB_REF_NAME", ""),
         "commit_sha": os.environ.get("GITHUB_SHA", ""),
         "trigger_type": trigger_type,
+        "trigger_type_label": trigger["trigger_type_label"],
+        "run_mode": trigger["run_mode"],
+        "is_manual_run": trigger["is_manual_run"],
+        "is_scheduled_run": trigger["is_scheduled_run"],
+        "schedule_status": trigger["schedule_status"],
         "scheduled_cron": scheduled_cron,
-        "cron_description_pkt": cron_description_pkt(scheduled_cron),
+        "cron_description_pkt": cron_description_pkt(scheduled_cron) if is_scheduled else None,
         "scheduled_time_utc": scheduled_time.isoformat(),
         "expected_run_time_utc": expected_utc.isoformat() if expected_utc else None,
         "scheduled_time_pkt": pkt_datetime_value(scheduled_time),
@@ -136,12 +129,14 @@ def build_row() -> dict:
         "day_of_week_pkt": day_of_week_pkt(start_dt),
         "hour_of_day_pkt": hour_of_day_pkt(start_dt),
         "duration_seconds": _duration_seconds(start_time, end_time),
-        "is_late_run": is_late_run,
-        "delay_minutes": delay_minutes,
+        "is_late_run": is_late_run if is_scheduled else False,
+        "delay_minutes": delay_minutes if is_scheduled else None,
         "execution_status": execution_status,
-        "dashboard_status": dashboard_status_label(outcome, execution_status),
+        "dashboard_status": dashboard_status_label(
+            outcome, execution_status, trigger["run_mode"]
+        ),
         "workflow_outcome": outcome,
-        "remarks": _build_remarks(outcome, warnings, error_message),
+        "remarks": build_remarks(outcome, warnings, error_message, trigger["is_manual_run"]),
         "error_message": None if error_message in {"", "None"} else error_message,
         "error_type": error_type or None,
         "failed_step": os.environ.get("FAILED_STEP") or None,

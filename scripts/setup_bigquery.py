@@ -104,6 +104,36 @@ def table_schema() -> list[bigquery.SchemaField]:
             description="GitHub event trigger: schedule, workflow_dispatch, push, etc.",
         ),
         bigquery.SchemaField(
+            "trigger_type_label",
+            "STRING",
+            mode="NULLABLE",
+            description="Human-readable trigger for Looker: Manual Run, Scheduled Cron, etc.",
+        ),
+        bigquery.SchemaField(
+            "run_mode",
+            "STRING",
+            mode="NULLABLE",
+            description="Manual, Scheduled, or Other — how this run was started.",
+        ),
+        bigquery.SchemaField(
+            "is_manual_run",
+            "BOOL",
+            mode="NULLABLE",
+            description="True when triggered via workflow_dispatch (Run workflow button).",
+        ),
+        bigquery.SchemaField(
+            "is_scheduled_run",
+            "BOOL",
+            mode="NULLABLE",
+            description="True when triggered by an active cron schedule.",
+        ),
+        bigquery.SchemaField(
+            "schedule_status",
+            "STRING",
+            mode="NULLABLE",
+            description="Active, Disabled (manual only), or Manual trigger — reflects cron config state.",
+        ),
+        bigquery.SchemaField(
             "scheduled_cron",
             "STRING",
             mode="NULLABLE",

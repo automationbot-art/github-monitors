@@ -6,9 +6,9 @@ Reusable GitHub Actions monitoring for scheduled cron workflows. **BigQuery + Lo
 
 ## Documentation
 
-- [docs/setup.md](docs/setup.md) — integration guide
-- [docs/bigquery.md](docs/bigquery.md) — dataset, table, Looker columns
-- [skills/](skills/) — Harness-style agent skills
+- **[docs/INTEGRATE-EVERY-REPO.md](docs/INTEGRATE-EVERY-REPO.md)** — what to paste in every cron repo
+- [docs/setup.md](docs/setup.md) — overview
+- [docs/bigquery.md](docs/bigquery.md) — Looker columns (PKT + manual/scheduled)
 
 ## BigQuery target
 
