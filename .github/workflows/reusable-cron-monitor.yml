@@ -1,32 +1,5 @@
 # =============================================================================
-# Reusable Workflow: Cron Monitor
-# =============================================================================
-# Call this from any repository after your cron job job completes.
-# It always writes a job summary and uploads media/workflow-summary.md.
-# Slack is sent only when workflow-status is "failure".
-#
-# Usage in a consumer repo (.github/workflows/cron.yml):
-#
-# jobs:
-#   cron:
-#     runs-on: ubuntu-latest
-#     outputs:
-#       status: ${{ steps.cron.outcome }}
-#     steps:
-#       - uses: actions/checkout@v4
-#       - id: cron
-#         run: python main.py 2>&1 | tee "${RUNNER_TEMP}/cron.log"
-#
-#   monitor:
-#     needs: cron
-#     if: always()
-#     uses: automationbot-art/github-monitor/.github/workflows/reusable-cron-monitor.yml@main
-#     secrets:
-#       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-#     with:
-#       workflow-status: ${{ needs.cron.result }}
-#       failed-step: Run cron job
-#       log-file: ${{ needs.cron.outputs.log-file }}  # optional pattern
+# Reusable Workflow: Cron Monitor (BigQuery + summary)
 # =============================================================================
 
 name: Reusable Cron Monitor
@@ -58,32 +31,37 @@ on:
         required: false
         type: string
         default: ""
+      scheduled-cron:
+        description: Cron expression when not auto-detected from schedule event
+        required: false
+        type: string
+        default: ""
       artifact-retention-days:
         description: Artifact retention for workflow-summary
         required: false
         type: string
         default: "30"
     secrets:
-      SLACK_WEBHOOK_URL:
-        description: Slack Incoming Webhook URL
+      LIVESTORE_SA_JSON:
+        description: GCP service account JSON for BigQuery writes
         required: true
 
 jobs:
   monitor:
-    name: Workflow summary and Slack alert
+    name: Workflow summary and BigQuery log
     runs-on: ubuntu-latest
     steps:
-      # Checkout is required so media/workflow-summary.md lands in the repo workspace.
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Run workflow monitor
         uses: ./.github/actions/workflow-monitor
         with:
-          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
           workflow-status: ${{ inputs.workflow-status }}
           failed-step: ${{ inputs.failed-step }}
           log-file: ${{ inputs.log-file }}
           records-processed: ${{ inputs.records-processed }}
           warnings: ${{ inputs.warnings }}
+          scheduled-cron: ${{ inputs.scheduled-cron }}
           artifact-retention-days: ${{ inputs.artifact-retention-days }}

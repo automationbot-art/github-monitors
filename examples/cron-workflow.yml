@@ -1,17 +1,11 @@
 # =============================================================================
-# Example: Scheduled cron workflow with monitoring (copy into each cron repo)
-# =============================================================================
-# Minimal changes needed per repository:
-#   1. Uses automationbot-art/github-monitor (update if forked elsewhere)
-#   2. Add secret SLACK_WEBHOOK_URL at org or repo level
-#   3. Adjust schedule, Python version, and the "Run cron job" command
+# Example: Scheduled cron workflow with BigQuery monitoring
 # =============================================================================
 
 name: Daily Cron With Monitor
 
 on:
   schedule:
-    # Every day at 06:00 UTC
     - cron: "0 6 * * *"
   workflow_dispatch:
 
@@ -22,8 +16,6 @@ jobs:
   cron:
     name: Run scheduled task
     runs-on: ubuntu-latest
-    outputs:
-      records-processed: ${{ steps.cron.outputs.records-processed }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,20 +28,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # Capture stdout/stderr so the monitor can extract the real error message.
       - name: Run cron job
         id: cron
         run: |
           set -o pipefail
           python main.py 2>&1 | tee "${RUNNER_TEMP}/cron-output.log"
-          echo "records-processed=0" >> "$GITHUB_OUTPUT"
+          ROWS="$(grep -oE 'rows~=[0-9]+' "${RUNNER_TEMP}/cron-output.log" | tail -1 | cut -d= -f2 || true)"
+          echo "records-processed=${ROWS:-0}" >> "$GITHUB_OUTPUT"
 
-      # Always run monitor: summary + artifact on every run, Slack only on failure.
       - name: Workflow monitor
         if: always()
         uses: automationbot-art/github-monitor/.github/actions/workflow-monitor@main
         with:
-          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
           workflow-status: ${{ steps.cron.outcome }}
           failed-step: Run cron job
           log-file: ${{ runner.temp }}/cron-output.log

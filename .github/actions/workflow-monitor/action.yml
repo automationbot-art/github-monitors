@@ -1,14 +1,14 @@
 name: Workflow Monitor
 description: >
   Generate a Markdown job summary, save media/workflow-summary.md, upload the
-  workflow-summary artifact, and send Slack alerts on failure only.
+  workflow-summary artifact, and record run metadata in BigQuery for Looker Studio.
 branding:
-  icon: bell
-  color: red
+  icon: graph
+  color: blue
 
 inputs:
-  slack-webhook-url:
-    description: Slack Incoming Webhook URL (store in repository or org secret SLACK_WEBHOOK_URL)
+  gcp-credentials-json:
+    description: GCP service account JSON (org secret LIVESTORE_SA_JSON). Used to write to BigQuery.
     required: true
   workflow-status:
     description: Outcome of the monitored step or job (success, failure, cancelled)
@@ -30,13 +30,21 @@ inputs:
     required: false
     default: ""
   job-started-at:
-    description: ISO-8601 job start timestamp (pass github.event.repository.updated_at or a step output)
+    description: ISO-8601 job start timestamp
+    required: false
+    default: ""
+  scheduled-cron:
+    description: Cron expression for scheduled workflows (auto-detected when empty)
     required: false
     default: ""
   artifact-retention-days:
     description: Artifact retention in days
     required: false
     default: "30"
+  # slack-webhook-url:
+  #   description: Slack Incoming Webhook URL (disabled — enable when notifications return)
+  #   required: false
+  #   default: ""
 
 outputs:
   summary-path:
@@ -48,6 +56,9 @@ outputs:
   action-required:
     description: Recommended remediation for the failure
     value: ${{ steps.parse-error.outputs.action-required }}
+  bigquery-event-id:
+    description: UUID of the row inserted into BigQuery
+    value: ${{ steps.bigquery-insert.outputs.event-id }}
 
 runs:
   using: composite
@@ -59,11 +70,6 @@ runs:
       id: context
       shell: bash
       env:
-        INPUT_STATUS: ${{ inputs.workflow-status }}
-        INPUT_FAILED_STEP: ${{ inputs.failed-step }}
-        INPUT_LOG_FILE: ${{ inputs.log-file }}
-        INPUT_RECORDS: ${{ inputs.records-processed }}
-        INPUT_WARNINGS: ${{ inputs.warnings }}
         INPUT_JOB_STARTED: ${{ inputs.job-started-at }}
       run: |
         set -euo pipefail
@@ -92,9 +98,10 @@ runs:
       env:
         INPUT_FAILED_STEP: ${{ inputs.failed-step }}
         INPUT_LOG_FILE: ${{ inputs.log-file }}
+        ERROR_JSON: ${{ runner.temp }}/workflow-monitor/error.json
       run: |
         set -euo pipefail
-        ARGS=(python3 "${{ github.action_path }}/scripts/extract_error.py" --output-file "${RUNNER_TEMP}/workflow-monitor/error.json")
+        ARGS=(python3 "${{ github.action_path }}/scripts/extract_error.py" --output-file "${ERROR_JSON}")
         if [ -n "${INPUT_FAILED_STEP}" ]; then
           ARGS+=(--failed-step "${INPUT_FAILED_STEP}")
         fi
@@ -102,18 +109,14 @@ runs:
           ARGS+=(--log-file "${INPUT_LOG_FILE}")
         fi
         "${ARGS[@]}"
-        ERROR_MESSAGE="$(python3 -c "import json; print(json.load(open('${RUNNER_TEMP}/workflow-monitor/error.json'))['error_message'])")"
-        FAILED_STEP="$(python3 -c "import json; print(json.load(open('${RUNNER_TEMP}/workflow-monitor/error.json'))['failed_step'])")"
-        ACTION_REQUIRED="$(python3 -c "import json; print(json.load(open('${RUNNER_TEMP}/workflow-monitor/error.json'))['action_required'])")"
-        {
-          echo "error-message<<EOF"
-          echo "${ERROR_MESSAGE}"
-          echo "EOF"
-          echo "failed-step=${FAILED_STEP}"
-          echo "action-required<<EOF"
-          echo "${ACTION_REQUIRED}"
-          echo "EOF"
-        } >> "$GITHUB_OUTPUT"
+        python3 - <<'PY' >> "$GITHUB_OUTPUT"
+        import json, os
+        data = json.load(open(os.environ["ERROR_JSON"]))
+        print(f"error-message<<EOF\n{data['error_message']}\nEOF")
+        print(f"error-type={data['error_type']}")
+        print(f"failed-step={data['failed_step']}")
+        print(f"action-required<<EOF\n{data['action_required']}\nEOF")
+        PY
 
     - name: Set success defaults
       id: parse-success
@@ -122,6 +125,7 @@ runs:
       run: |
         {
           echo "error-message=None"
+          echo "error-type="
           echo "failed-step="
           echo "action-required=No action required."
         } >> "$GITHUB_OUTPUT"
@@ -168,35 +172,79 @@ runs:
         if-no-files-found: error
 
     # -------------------------------------------------------------------------
-    # 5. Build Slack payload (file-based to escape special characters safely)
+    # 5. Record workflow run in BigQuery (Looker Studio source)
     # -------------------------------------------------------------------------
-    - name: Build Slack failure payload
-      id: slack-payload
-      if: ${{ inputs.workflow-status == 'failure' }}
+    - name: Install BigQuery client
       shell: bash
-      env:
-        REPOSITORY: ${{ github.repository }}
-        WORKFLOW: ${{ github.workflow }}
-        FAILED_STEP: ${{ steps.parse-error.outputs.failed-step || inputs.failed-step }}
-        ERROR_MESSAGE: ${{ steps.parse-error.outputs.error-message }}
-        ACTION_REQUIRED: ${{ steps.parse-error.outputs.action-required }}
-        RUN_URL: ${{ steps.context.outputs.run-url }}
-        ARTIFACT_URL: ${{ steps.context.outputs.artifact-url }}
+      run: pip install --quiet google-cloud-bigquery
+
+    - name: Write GCP credentials
+      shell: bash
       run: |
         set -euo pipefail
-        PAYLOAD_FILE="${RUNNER_TEMP}/workflow-monitor/slack-payload.json"
-        export PAYLOAD_FILE
-        python3 "${{ github.action_path }}/scripts/build_slack_payload.py"
-        echo "payload-file=${PAYLOAD_FILE}" >> "$GITHUB_OUTPUT"
+        CREDS_FILE="${RUNNER_TEMP}/workflow-monitor/gcp-sa.json"
+        printf '%s' "${GCP_CREDENTIALS_JSON}" > "${CREDS_FILE}"
+        echo "credentials-file=${CREDS_FILE}" >> "$GITHUB_OUTPUT"
+      env:
+        GCP_CREDENTIALS_JSON: ${{ inputs.gcp-credentials-json }}
+
+    - name: Insert workflow run into BigQuery
+      id: bigquery-insert
+      shell: bash
+      env:
+        INPUT_STATUS: ${{ inputs.workflow-status }}
+        INPUT_RECORDS: ${{ inputs.records-processed }}
+        INPUT_WARNINGS: ${{ inputs.warnings }}
+        INPUT_LOG_FILE: ${{ inputs.log-file }}
+        ERROR_MESSAGE: ${{ steps.parse-error.outputs.error-message || steps.parse-success.outputs.error-message }}
+        ERROR_TYPE: ${{ steps.parse-error.outputs.error-type || steps.parse-success.outputs.error-type }}
+        FAILED_STEP: ${{ steps.parse-error.outputs.failed-step || steps.parse-success.outputs.failed-step }}
+        ACTION_REQUIRED: ${{ steps.parse-error.outputs.action-required || steps.parse-success.outputs.action-required }}
+        START_TIME: ${{ steps.context.outputs.start-time }}
+        END_TIME: ${{ steps.context.outputs.end-time }}
+        RUN_URL: ${{ steps.context.outputs.run-url }}
+        ARTIFACT_URL: ${{ steps.context.outputs.artifact-url }}
+        SCHEDULED_CRON: ${{ inputs.scheduled-cron || github.event.schedule }}
+        SCHEDULED_TIME_UTC: ${{ steps.context.outputs.start-time }}
+        GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/workflow-monitor/gcp-sa.json
+      run: |
+        set -euo pipefail
+        ROW_FILE="${RUNNER_TEMP}/workflow-monitor/bq-row.json"
+        python3 "${{ github.action_path }}/scripts/build_bq_row.py" > "${ROW_FILE}"
+        EVENT_ID="$(python3 -c "import json; print(json.load(open('${ROW_FILE}'))['event_id'])")"
+        python3 "${{ github.action_path }}/scripts/insert_workflow_run.py" \
+          --row-json "${ROW_FILE}" \
+          --config "${{ github.action_path }}/config/bigquery.json" \
+          --credentials "${GOOGLE_APPLICATION_CREDENTIALS}"
+        echo "event-id=${EVENT_ID}" >> "$GITHUB_OUTPUT"
 
     # -------------------------------------------------------------------------
-    # 6. Slack alert — failures only (no notification on success)
+    # 6. Slack notifications (disabled — uncomment when ready)
     # -------------------------------------------------------------------------
-    - name: Notify Slack on failure
-      if: ${{ inputs.workflow-status == 'failure' }}
-      uses: slackapi/slack-github-action@v2.0.0
-      with:
-        webhook: ${{ inputs.slack-webhook-url }}
-        webhook-type: incoming-webhook
-        errors: true
-        payload-file-path: ${{ steps.slack-payload.outputs.payload-file }}
+    # - name: Build Slack failure payload
+    #   id: slack-payload
+    #   if: ${{ inputs.workflow-status == 'failure' }}
+    #   shell: bash
+    #   env:
+    #     REPOSITORY: ${{ github.repository }}
+    #     WORKFLOW: ${{ github.workflow }}
+    #     FAILED_STEP: ${{ steps.parse-error.outputs.failed-step || inputs.failed-step }}
+    #     ERROR_MESSAGE: ${{ steps.parse-error.outputs.error-message }}
+    #     ACTION_REQUIRED: ${{ steps.parse-error.outputs.action-required }}
+    #     RUN_URL: ${{ steps.context.outputs.run-url }}
+    #     ARTIFACT_URL: ${{ steps.context.outputs.artifact-url }}
+    #   run: |
+    #     set -euo pipefail
+    #     PAYLOAD_FILE="${RUNNER_TEMP}/workflow-monitor/slack-payload.json"
+    #     export PAYLOAD_FILE
+    #     python3 "${{ github.action_path }}/scripts/build_slack_payload.py"
+    #     echo "payload-file=${PAYLOAD_FILE}" >> "$GITHUB_OUTPUT"
+    #
+    # - name: Notify Slack on failure
+    #   if: ${{ inputs.workflow-status == 'failure' }}
+    #   uses: slackapi/slack-github-action@v2.0.0
+    #   with:
+    #     webhook: ${{ inputs.slack-webhook-url }}
+    #     webhook-type: incoming-webhook
+    #     errors: true
+    #     payload-file-path: ${{ steps.slack-payload.outputs.payload-file }}

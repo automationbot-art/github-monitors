@@ -1,0 +1,44 @@
+# =============================================================================
+# One-time (or on-demand) BigQuery provisioning for Looker Studio
+# =============================================================================
+# Creates dataset github_cron_monitoring and table workflow_run_events.
+# Requires org secret LIVESTORE_SA_JSON (full service account JSON).
+# =============================================================================
+
+name: Setup BigQuery Monitoring
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write service account credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "${LIVESTORE_SA_JSON}" > "${RUNNER_TEMP}/gcp-sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=${RUNNER_TEMP}/gcp-sa.json" >> "$GITHUB_ENV"
+        env:
+          LIVESTORE_SA_JSON: ${{ secrets.LIVESTORE_SA_JSON }}
+
+      - name: Create dataset and table
+        run: |
+          python scripts/setup_bigquery.py \
+            --config config/bigquery.json \
+            --credentials "${GOOGLE_APPLICATION_CREDENTIALS}"

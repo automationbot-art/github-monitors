@@ -1,8 +1,5 @@
 # =============================================================================
-# Self-test workflow for github-monitors
-# =============================================================================
-# Validates success and failure paths for summaries, artifacts, and Slack.
-# Add repository secret SLACK_WEBHOOK_URL before enabling scheduled runs.
+# Self-test workflow for github-monitor (summary + BigQuery insert)
 # =============================================================================
 
 name: Monitor Self Test
@@ -11,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       simulate-failure:
-        description: Force a failing cron step to test Slack + error parsing
+        description: Force a failing cron step to test error parsing and BigQuery row
         required: false
         type: boolean
         default: false
@@ -35,7 +32,7 @@ jobs:
           if [ "${{ inputs.simulate-failure }}" = "true" ]; then
             python3 -c "raise ValueError('Simulated cron failure: missing BIGQUERY_TABLE env var')" 2>&1 | tee "${LOG}"
           else
-            python3 -c "print('Cron completed successfully'); print('records_processed=42')" 2>&1 | tee "${LOG}"
+            python3 -c "print('[done] rows~=42'); print('Cron completed successfully')" 2>&1 | tee "${LOG}"
             echo "records-processed=42" >> "$GITHUB_OUTPUT"
           fi
 
@@ -43,7 +40,7 @@ jobs:
         if: always()
         uses: ./.github/actions/workflow-monitor
         with:
-          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
           workflow-status: ${{ steps.cron.outcome }}
           failed-step: Run simulated cron job
           log-file: ${{ runner.temp }}/cron-output.log
