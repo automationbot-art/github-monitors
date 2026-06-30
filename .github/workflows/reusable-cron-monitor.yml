@@ -1,0 +1,89 @@
+# =============================================================================
+# Reusable Workflow: Cron Monitor
+# =============================================================================
+# Call this from any repository after your cron job job completes.
+# It always writes a job summary and uploads media/workflow-summary.md.
+# Slack is sent only when workflow-status is "failure".
+#
+# Usage in a consumer repo (.github/workflows/cron.yml):
+#
+# jobs:
+#   cron:
+#     runs-on: ubuntu-latest
+#     outputs:
+#       status: ${{ steps.cron.outcome }}
+#     steps:
+#       - uses: actions/checkout@v4
+#       - id: cron
+#         run: python main.py 2>&1 | tee "${RUNNER_TEMP}/cron.log"
+#
+#   monitor:
+#     needs: cron
+#     if: always()
+#     uses: automationbot-art/github-monitor/.github/workflows/reusable-cron-monitor.yml@main
+#     secrets:
+#       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+#     with:
+#       workflow-status: ${{ needs.cron.result }}
+#       failed-step: Run cron job
+#       log-file: ${{ needs.cron.outputs.log-file }}  # optional pattern
+# =============================================================================
+
+name: Reusable Cron Monitor
+
+on:
+  workflow_call:
+    inputs:
+      workflow-status:
+        description: Result of the monitored job (success, failure, cancelled)
+        required: true
+        type: string
+      failed-step:
+        description: Name of the step that failed
+        required: false
+        type: string
+        default: ""
+      log-file:
+        description: Absolute path to captured step log on the runner
+        required: false
+        type: string
+        default: ""
+      records-processed:
+        description: Optional processed record count for the summary table
+        required: false
+        type: string
+        default: ""
+      warnings:
+        description: Optional warnings to show in the summary
+        required: false
+        type: string
+        default: ""
+      artifact-retention-days:
+        description: Artifact retention for workflow-summary
+        required: false
+        type: string
+        default: "30"
+    secrets:
+      SLACK_WEBHOOK_URL:
+        description: Slack Incoming Webhook URL
+        required: true
+
+jobs:
+  monitor:
+    name: Workflow summary and Slack alert
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout is required so media/workflow-summary.md lands in the repo workspace.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run workflow monitor
+        uses: ./.github/actions/workflow-monitor
+        with:
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          workflow-status: ${{ inputs.workflow-status }}
+          failed-step: ${{ inputs.failed-step }}
+          log-file: ${{ inputs.log-file }}
+          records-processed: ${{ inputs.records-processed }}
+          warnings: ${{ inputs.warnings }}
+          artifact-retention-days: ${{ inputs.artifact-retention-days }}

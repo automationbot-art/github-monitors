@@ -1,0 +1,202 @@
+name: Workflow Monitor
+description: >
+  Generate a Markdown job summary, save media/workflow-summary.md, upload the
+  workflow-summary artifact, and send Slack alerts on failure only.
+branding:
+  icon: bell
+  color: red
+
+inputs:
+  slack-webhook-url:
+    description: Slack Incoming Webhook URL (store in repository or org secret SLACK_WEBHOOK_URL)
+    required: true
+  workflow-status:
+    description: Outcome of the monitored step or job (success, failure, cancelled)
+    required: true
+  failed-step:
+    description: Human-readable name of the step that failed
+    required: false
+    default: ""
+  log-file:
+    description: Path to captured stdout/stderr from the failed step
+    required: false
+    default: ""
+  records-processed:
+    description: Optional count of records processed by the cron job
+    required: false
+    default: ""
+  warnings:
+    description: Optional warning text to include in the summary
+    required: false
+    default: ""
+  job-started-at:
+    description: ISO-8601 job start timestamp (pass github.event.repository.updated_at or a step output)
+    required: false
+    default: ""
+  artifact-retention-days:
+    description: Artifact retention in days
+    required: false
+    default: "30"
+
+outputs:
+  summary-path:
+    description: Path to the generated media/workflow-summary.md file
+    value: ${{ steps.write-summary.outputs.summary-path }}
+  error-message:
+    description: Extracted error message when the workflow failed
+    value: ${{ steps.parse-error.outputs.error-message }}
+  action-required:
+    description: Recommended remediation for the failure
+    value: ${{ steps.parse-error.outputs.action-required }}
+
+runs:
+  using: composite
+  steps:
+    # -------------------------------------------------------------------------
+    # 1. Prepare workspace paths and timestamps
+    # -------------------------------------------------------------------------
+    - name: Prepare monitor context
+      id: context
+      shell: bash
+      env:
+        INPUT_STATUS: ${{ inputs.workflow-status }}
+        INPUT_FAILED_STEP: ${{ inputs.failed-step }}
+        INPUT_LOG_FILE: ${{ inputs.log-file }}
+        INPUT_RECORDS: ${{ inputs.records-processed }}
+        INPUT_WARNINGS: ${{ inputs.warnings }}
+        INPUT_JOB_STARTED: ${{ inputs.job-started-at }}
+      run: |
+        set -euo pipefail
+        mkdir -p media "${RUNNER_TEMP}/workflow-monitor"
+        END_TIME="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        if [ -n "${INPUT_JOB_STARTED}" ]; then
+          START_TIME="${INPUT_JOB_STARTED}"
+        else
+          START_TIME="${END_TIME}"
+        fi
+        RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+        ARTIFACT_URL="${RUN_URL}#artifacts"
+        echo "end-time=${END_TIME}" >> "$GITHUB_OUTPUT"
+        echo "start-time=${START_TIME}" >> "$GITHUB_OUTPUT"
+        echo "run-url=${RUN_URL}" >> "$GITHUB_OUTPUT"
+        echo "artifact-url=${ARTIFACT_URL}" >> "$GITHUB_OUTPUT"
+        echo "summary-path=${GITHUB_WORKSPACE}/media/workflow-summary.md" >> "$GITHUB_OUTPUT"
+
+    # -------------------------------------------------------------------------
+    # 2. Extract actionable error details from logs (failures only)
+    # -------------------------------------------------------------------------
+    - name: Parse failure details
+      id: parse-error
+      if: ${{ inputs.workflow-status == 'failure' }}
+      shell: bash
+      env:
+        INPUT_FAILED_STEP: ${{ inputs.failed-step }}
+        INPUT_LOG_FILE: ${{ inputs.log-file }}
+      run: |
+        set -euo pipefail
+        ARGS=(python3 "${{ github.action_path }}/scripts/extract_error.py" --output-file "${RUNNER_TEMP}/workflow-monitor/error.json")
+        if [ -n "${INPUT_FAILED_STEP}" ]; then
+          ARGS+=(--failed-step "${INPUT_FAILED_STEP}")
+        fi
+        if [ -n "${INPUT_LOG_FILE}" ] && [ -f "${INPUT_LOG_FILE}" ]; then
+          ARGS+=(--log-file "${INPUT_LOG_FILE}")
+        fi
+        "${ARGS[@]}"
+        ERROR_MESSAGE="$(python3 -c "import json; print(json.load(open('${RUNNER_TEMP}/workflow-monitor/error.json'))['error_message'])")"
+        FAILED_STEP="$(python3 -c "import json; print(json.load(open('${RUNNER_TEMP}/workflow-monitor/error.json'))['failed_step'])")"
+        ACTION_REQUIRED="$(python3 -c "import json; print(json.load(open('${RUNNER_TEMP}/workflow-monitor/error.json'))['action_required'])")"
+        {
+          echo "error-message<<EOF"
+          echo "${ERROR_MESSAGE}"
+          echo "EOF"
+          echo "failed-step=${FAILED_STEP}"
+          echo "action-required<<EOF"
+          echo "${ACTION_REQUIRED}"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Set success defaults
+      id: parse-success
+      if: ${{ inputs.workflow-status != 'failure' }}
+      shell: bash
+      run: |
+        {
+          echo "error-message=None"
+          echo "failed-step="
+          echo "action-required=No action required."
+        } >> "$GITHUB_OUTPUT"
+
+    # -------------------------------------------------------------------------
+    # 3. Build Markdown summary (GITHUB_STEP_SUMMARY + media/workflow-summary.md)
+    # -------------------------------------------------------------------------
+    - name: Write workflow summary
+      id: write-summary
+      shell: bash
+      env:
+        INPUT_STATUS: ${{ inputs.workflow-status }}
+        INPUT_RECORDS: ${{ inputs.records-processed }}
+        INPUT_WARNINGS: ${{ inputs.warnings }}
+        ERROR_MESSAGE: ${{ steps.parse-error.outputs.error-message || steps.parse-success.outputs.error-message }}
+        FAILED_STEP: ${{ steps.parse-error.outputs.failed-step || steps.parse-success.outputs.failed-step }}
+        ACTION_REQUIRED: ${{ steps.parse-error.outputs.action-required || steps.parse-success.outputs.action-required }}
+        START_TIME: ${{ steps.context.outputs.start-time }}
+        END_TIME: ${{ steps.context.outputs.end-time }}
+        RUN_URL: ${{ steps.context.outputs.run-url }}
+        ARTIFACT_URL: ${{ steps.context.outputs.artifact-url }}
+      run: |
+        set -euo pipefail
+        export INPUT_STATUS INPUT_RECORDS INPUT_WARNINGS ERROR_MESSAGE FAILED_STEP ACTION_REQUIRED
+        export START_TIME END_TIME RUN_URL ARTIFACT_URL
+        python3 "${{ github.action_path }}/scripts/build_summary_input.py" \
+          > "${RUNNER_TEMP}/workflow-monitor/summary-input.json"
+        SUMMARY_PATH="${{ steps.context.outputs.summary-path }}"
+        python3 "${{ github.action_path }}/scripts/generate_summary.py" \
+          --input-json "${RUNNER_TEMP}/workflow-monitor/summary-input.json" \
+          --output-file "${SUMMARY_PATH}" \
+          --step-summary-file "${GITHUB_STEP_SUMMARY}"
+        echo "summary-path=${SUMMARY_PATH}" >> "$GITHUB_OUTPUT"
+
+    # -------------------------------------------------------------------------
+    # 4. Upload media/ as a 30-day artifact named workflow-summary
+    # -------------------------------------------------------------------------
+    - name: Upload workflow summary artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: workflow-summary
+        path: media/
+        retention-days: ${{ inputs.artifact-retention-days }}
+        if-no-files-found: error
+
+    # -------------------------------------------------------------------------
+    # 5. Build Slack payload (file-based to escape special characters safely)
+    # -------------------------------------------------------------------------
+    - name: Build Slack failure payload
+      id: slack-payload
+      if: ${{ inputs.workflow-status == 'failure' }}
+      shell: bash
+      env:
+        REPOSITORY: ${{ github.repository }}
+        WORKFLOW: ${{ github.workflow }}
+        FAILED_STEP: ${{ steps.parse-error.outputs.failed-step || inputs.failed-step }}
+        ERROR_MESSAGE: ${{ steps.parse-error.outputs.error-message }}
+        ACTION_REQUIRED: ${{ steps.parse-error.outputs.action-required }}
+        RUN_URL: ${{ steps.context.outputs.run-url }}
+        ARTIFACT_URL: ${{ steps.context.outputs.artifact-url }}
+      run: |
+        set -euo pipefail
+        PAYLOAD_FILE="${RUNNER_TEMP}/workflow-monitor/slack-payload.json"
+        export PAYLOAD_FILE
+        python3 "${{ github.action_path }}/scripts/build_slack_payload.py"
+        echo "payload-file=${PAYLOAD_FILE}" >> "$GITHUB_OUTPUT"
+
+    # -------------------------------------------------------------------------
+    # 6. Slack alert — failures only (no notification on success)
+    # -------------------------------------------------------------------------
+    - name: Notify Slack on failure
+      if: ${{ inputs.workflow-status == 'failure' }}
+      uses: slackapi/slack-github-action@v2.0.0
+      with:
+        webhook: ${{ inputs.slack-webhook-url }}
+        webhook-type: incoming-webhook
+        errors: true
+        payload-file-path: ${{ steps.slack-payload.outputs.payload-file }}
