@@ -11,11 +11,13 @@ See `docs/SECRETS-AND-PRIVATE-REPOS.md` in github-monitor.
 
 Make **github-monitor** public (recommended) OR enable org Actions access to that private repo.
 
+## One central table
+
 ```
 combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events
 ```
 
-## ⛔ ONE central table — not per repo
+**Never** in cron repos:
 - Create BigQuery datasets/tables
 - Copy `setup_bigquery.py` or `config/bigquery.json`
 - Add BigQuery setup workflows
