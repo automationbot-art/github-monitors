@@ -15,7 +15,7 @@ Central monitoring for automationbot-art cron repos.
 
 ## Secret (org, once)
 
-`LIVESTORE_SA_JSON` — full service account JSON
+`LIVESTORE_SA_BASE64` — base64-encoded service account JSON (decoded at runtime)
 
 ## Action path for cron repos
 

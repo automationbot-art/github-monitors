@@ -4,7 +4,7 @@
 
 | Secret | Where |
 | --- | --- |
-| `LIVESTORE_SA_JSON` | automationbot-art org → Actions secrets → all repos |
+| `LIVESTORE_SA_BASE64` | automationbot-art org → Actions secrets → all repos (base64-encoded SA JSON) |
 
 ## 2. Private repo access
 

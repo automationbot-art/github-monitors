@@ -40,7 +40,7 @@ jobs:
         if: always()
         uses: ./.github/actions/workflow-monitor
         with:
-          gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
+          gcp-credentials-base64: ${{ secrets.LIVESTORE_SA_BASE64 }}
           workflow-status: ${{ steps.cron.outcome }}
           failed-step: Run simulated cron job
           log-file: ${{ runner.temp }}/cron-output.log

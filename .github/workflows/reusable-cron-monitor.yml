@@ -42,8 +42,8 @@ on:
         type: string
         default: "30"
     secrets:
-      LIVESTORE_SA_JSON:
-        description: GCP service account JSON for BigQuery writes
+      LIVESTORE_SA_BASE64:
+        description: Base64-encoded GCP service account JSON for BigQuery writes
         required: true
 
 jobs:
@@ -57,7 +57,7 @@ jobs:
       - name: Run workflow monitor
         uses: ./.github/actions/workflow-monitor
         with:
-          gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
+          gcp-credentials-base64: ${{ secrets.LIVESTORE_SA_BASE64 }}
           workflow-status: ${{ inputs.workflow-status }}
           failed-step: ${{ inputs.failed-step }}
           log-file: ${{ inputs.log-file }}

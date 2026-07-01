@@ -10,6 +10,6 @@ NO BigQuery scripts/tables in this repo. Do NOT change schedule/cron lines.
 
 Add tee + Workflow monitor:
   uses: automationbot-art/github-monitors/.github/actions/workflow-monitor@main
-  gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
+  gcp-credentials-base64: ${{ secrets.LIVESTORE_SA_BASE64 }}
   schedule-status: manual-only (if cron commented)
 ```

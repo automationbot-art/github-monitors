@@ -8,8 +8,8 @@ branding:
   color: blue
 
 inputs:
-  gcp-credentials-json:
-    description: GCP service account JSON (org secret LIVESTORE_SA_JSON). Used to write to BigQuery.
+  gcp-credentials-base64:
+    description: Base64-encoded GCP service account JSON (org secret LIVESTORE_SA_BASE64). Decoded at runtime.
     required: true
   workflow-status:
     description: Outcome of the monitored step or job (success, failure, cancelled)
@@ -190,10 +190,11 @@ runs:
       run: |
         set -euo pipefail
         CREDS_FILE="${RUNNER_TEMP}/workflow-monitor/gcp-sa.json"
-        printf '%s' "${GCP_CREDENTIALS_JSON}" > "${CREDS_FILE}"
+        printf '%s' "${GCP_CREDENTIALS_BASE64}" | base64 -d > "${CREDS_FILE}"
+        python3 -c "import json; json.load(open('${CREDS_FILE}'))"
         echo "credentials-file=${CREDS_FILE}" >> "$GITHUB_OUTPUT"
       env:
-        GCP_CREDENTIALS_JSON: ${{ inputs.gcp-credentials-json }}
+        GCP_CREDENTIALS_BASE64: ${{ inputs.gcp-credentials-base64 }}
 
     - name: Insert workflow run into BigQuery
       id: bigquery-insert

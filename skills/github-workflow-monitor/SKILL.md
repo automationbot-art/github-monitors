@@ -26,7 +26,7 @@ Only edit `.github/workflows/*.yml`.
 
 ## Org secret (once)
 
-`LIVESTORE_SA_JSON` on **automationbot-art** org.
+`LIVESTORE_SA_BASE64` on **automationbot-art** org.
 
 ## Do not change schedule
 
@@ -53,7 +53,7 @@ Leave commented cron and `workflow_dispatch` exactly as they are.
   if: always()
   uses: automationbot-art/github-monitors/.github/actions/workflow-monitor@main
   with:
-    gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
+    gcp-credentials-json: ${{ secrets.LIVESTORE_SA_BASE64 }}
     workflow-status: ${{ steps.cron.outcome }}
     failed-step: <exact step name>
     log-file: ${{ runner.temp }}/cron-output.log

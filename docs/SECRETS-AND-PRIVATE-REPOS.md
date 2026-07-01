@@ -10,7 +10,23 @@ All your repos are **private**. That is fine — but you must configure access s
 
 | Secret name | Value | Where to add |
 | --- | --- | --- |
-| **`LIVESTORE_SA_JSON`** | Full JSON from `config/livestore.json` (entire file, one line) | **automationbot-art** → Settings → Secrets and variables → **Actions** → New organization secret → Repository access: **All repositories** |
+| **`LIVESTORE_SA_BASE64`** | **Base64-encoded** service account JSON (see below) | **automationbot-art** → Settings → Secrets and variables → **Actions** → New organization secret → Repository access: **All repositories** |
+
+#### How to create the value
+
+Encode `config/livestore.json` as base64 (single line, no newlines):
+
+**PowerShell (Windows):**
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("config\livestore.json"))
+```
+
+**Linux / macOS / Git Bash:**
+```bash
+base64 -w 0 config/livestore.json
+```
+
+Paste the output as the secret value. Workflows decode it at runtime with `base64 -d`.
 
 No other secrets are required for monitoring (Slack is disabled).
 
@@ -18,13 +34,13 @@ No other secrets are required for monitoring (Slack is disabled).
 
 | Secret | When needed |
 | --- | --- |
-| `LIVESTORE_SA_JSON` | Running **Setup BigQuery Monitoring** or **Monitor Self Test** in this repo (org secret is enough if access includes this repo) |
+| `LIVESTORE_SA_BASE64` | Running **Setup BigQuery Monitoring** or **Monitor Self Test** (org secret is enough if access includes this repo) |
 
 ### Do NOT add per cron repo
 
 - No `SLACK_WEBHOOK_URL`
 - No separate GCP keys per repo
-- No repo-level copy of `LIVESTORE_SA_JSON` unless org secret cannot cover that repo
+- No repo-level copy of `LIVESTORE_SA_BASE64` unless org secret cannot cover that repo
 
 ---
 
@@ -93,7 +109,7 @@ Cron repos only **insert rows** via the monitor step. They do not create BigQuer
 
 ## Checklist
 
-- [ ] Org secret `LIVESTORE_SA_JSON` added with access to all cron repos
+- [ ] Org secret `LIVESTORE_SA_BASE64` added with access to all cron repos
 - [ ] `github-monitors` is **public** OR private with org Action access enabled
 - [ ] Cron workflow uses `automationbot-art/github-monitors/.github/actions/workflow-monitor@main`
 - [ ] No per-repo BigQuery setup scripts

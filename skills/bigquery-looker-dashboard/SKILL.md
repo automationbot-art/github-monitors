@@ -33,7 +33,7 @@ python scripts/setup_bigquery.py --config config/bigquery.json --credentials con
 
 ### GitHub Actions
 
-Run workflow **Setup BigQuery Monitoring** (requires `LIVESTORE_SA_JSON` secret).
+Run workflow **Setup BigQuery Monitoring** (requires `LIVESTORE_SA_BASE64` secret).
 
 ## Key columns for Looker Studio (PKT)
 

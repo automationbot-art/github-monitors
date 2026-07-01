@@ -14,7 +14,7 @@ uses: automationbot-art/github-monitors/.github/actions/workflow-monitor@main
 
 | Secret | Where |
 | --- | --- |
-| `LIVESTORE_SA_JSON` | **automationbot-art** org → Settings → Secrets → Actions → all repos |
+| `LIVESTORE_SA_BASE64` | **automationbot-art** org → Settings → Secrets → Actions → all repos |
 
 ---
 
@@ -74,5 +74,5 @@ LIMIT 10
 
 1. Confirm `uses:` line says **`github-monitors`** (with **s**)
 2. Confirm `github-monitors` repo is **public** on `main` branch
-3. Confirm org secret `LIVESTORE_SA_JSON` exists
+3. Confirm org secret `LIVESTORE_SA_BASE64` exists
 4. Re-run workflow

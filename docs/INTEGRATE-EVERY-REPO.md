@@ -20,7 +20,7 @@ Cron repos: **YAML only** — no BigQuery scripts, no new tables. See [DO-NOT-CR
 
 | Secret | Value |
 | --- | --- |
-| `LIVESTORE_SA_JSON` | Full `config/livestore.json` content |
+| `LIVESTORE_SA_BASE64` | Base64-encoded `config/livestore.json` |
 
 **automationbot-art** → Settings → Secrets → Actions → All repositories.
 
@@ -49,7 +49,7 @@ Leave commented `# schedule:` and `workflow_dispatch` **unchanged**.
         if: always()
         uses: automationbot-art/github-monitors/.github/actions/workflow-monitor@main
         with:
-          gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
+          gcp-credentials-base64: ${{ secrets.LIVESTORE_SA_BASE64 }}
           workflow-status: ${{ steps.cron.outcome }}
           failed-step: Run cron job
           log-file: ${{ runner.temp }}/cron-output.log
@@ -67,6 +67,6 @@ Omit `schedule-status` if active cron. Omit entire block duplication — one mon
 YAML ONLY. One table: combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events
 No BigQuery scripts/tables in this repo. Do not change schedule lines.
 uses: automationbot-art/github-monitors/.github/actions/workflow-monitor@main
-gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
+gcp-credentials-base64: ${{ secrets.LIVESTORE_SA_BASE64 }}
 schedule-status: manual-only if cron commented.
 ```
