@@ -32,11 +32,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          printf '%s' "${LIVESTORE_SA_BASE64}" | base64 -d > "${RUNNER_TEMP}/gcp-sa.json"
-          python3 -c "import json; json.load(open('${RUNNER_TEMP}/gcp-sa.json'))"
-          echo "GOOGLE_APPLICATION_CREDENTIALS=${RUNNER_TEMP}/gcp-sa.json" >> "$GITHUB_ENV"
-        env:
-          LIVESTORE_SA_BASE64: ${{ secrets.LIVESTORE_SA_BASE64 }}
+          export CREDS_FILE="${RUNNER_TEMP}/gcp-sa.json"
+          export GCP_CREDENTIALS_BASE64="${{ secrets.LIVESTORE_SA_BASE64 }}"
+          python3 .github/actions/workflow-monitor/scripts/decode_gcp_credentials.py
+          echo "GOOGLE_APPLICATION_CREDENTIALS=${CREDS_FILE}" >> "$GITHUB_ENV"
 
       - name: Create dataset and table
         run: |
