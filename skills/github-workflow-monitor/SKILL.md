@@ -53,7 +53,7 @@ Leave commented cron and `workflow_dispatch` exactly as they are.
   if: always()
   uses: automationbot-art/github-monitors/.github/actions/workflow-monitor@main
   with:
-    gcp-credentials-json: ${{ secrets.LIVESTORE_SA_BASE64 }}
+    gcp-credentials-base64: ${{ secrets.LIVESTORE_SA_BASE64 }}
     workflow-status: ${{ steps.cron.outcome }}
     failed-step: <exact step name>
     log-file: ${{ runner.temp }}/cron-output.log
