@@ -1,6 +1,6 @@
 # Secrets + private repo setup
 
-All your repos are **private**. That is fine — but you must configure access so cron repos can call the `github-monitor` action.
+All your repos are **private**. That is fine — but you must configure access so cron repos can call the `github-monitors` action.
 
 ---
 
@@ -14,7 +14,7 @@ All your repos are **private**. That is fine — but you must configure access s
 
 No other secrets are required for monitoring (Slack is disabled).
 
-### Optional — only in `github-monitor` repo (not cron repos)
+### Optional — only in `github-monitors` repo (not cron repos)
 
 | Secret | When needed |
 | --- | --- |
@@ -30,23 +30,23 @@ No other secrets are required for monitoring (Slack is disabled).
 
 ## Fix: `Unable to resolve action … repository not found`
 
-This error on **private** repos almost always means GitHub cannot **see** `automationbot-art/github-monitor` — not that your YAML is wrong.
+This error on **private** repos almost always means GitHub cannot **see** `automationbot-art/github-monitors` — not that your YAML is wrong.
 
-### Option A — Make `github-monitor` public (recommended)
+### Option A — Make `github-monitors` public (recommended)
 
 Safest and simplest for a **reusable action** repo:
 
-1. Open **automationbot-art/github-monitor** → **Settings** → **General** → Danger zone → **Change visibility** → **Public**
+1. Open **automationbot-art/github-monitors** → **Settings** → **General** → Danger zone → **Change visibility** → **Public**
 2. The repo contains **no secrets** (only action code). Your cron repos and data stay **private**.
 3. Re-run the failed workflow in `livestore_data_web`.
 
 Cron repos keep using:
 
 ```yaml
-uses: automationbot-art/github-monitor/.github/actions/workflow-monitor@main
+uses: automationbot-art/github-monitors/.github/actions/workflow-monitor@main
 ```
 
-### Option B — Keep `github-monitor` private (org configuration)
+### Option B — Keep `github-monitors` private (org configuration)
 
 Do **all** of these:
 
@@ -59,7 +59,7 @@ Do **all** of these:
 
 #### 2. Allow this repo’s action to be used by other org repos
 
-**automationbot-art/github-monitor** → **Settings** → **Actions** → **General**
+**automationbot-art/github-monitors** → **Settings** → **Actions** → **General**
 
 - Scroll to **Access**
 - Select: **Accessible from repositories in the 'automationbot-art' organization**
@@ -67,15 +67,15 @@ Do **all** of these:
 
 #### 3. Confirm the repo exists and the name is exact
 
-- URL must be: `https://github.com/automationbot-art/github-monitor`
-- Not `github-monitors` (with **s**)
+- URL must be: `https://github.com/automationbot-art/github-monitors`
+- Not `github-monitor` (without **s**)
 - Default branch must be **`main`** (matches `@main` in YAML)
 
 #### 4. Re-run workflow
 
 Actions → failed run → **Re-run all jobs**
 
-If it still fails, use **Option A** (public `github-monitor` only).
+If it still fails, use **Option A** (public `github-monitors` only).
 
 ---
 
@@ -94,7 +94,7 @@ Cron repos only **insert rows** via the monitor step. They do not create BigQuer
 ## Checklist
 
 - [ ] Org secret `LIVESTORE_SA_JSON` added with access to all cron repos
-- [ ] `github-monitor` is **public** OR private with org Action access enabled
-- [ ] Cron workflow uses `automationbot-art/github-monitor/.github/actions/workflow-monitor@main`
+- [ ] `github-monitors` is **public** OR private with org Action access enabled
+- [ ] Cron workflow uses `automationbot-art/github-monitors/.github/actions/workflow-monitor@main`
 - [ ] No per-repo BigQuery setup scripts
 - [ ] Re-run workflow after fixing access

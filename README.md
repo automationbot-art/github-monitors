@@ -1,38 +1,33 @@
-# github-monitor
+# github-monitors
 
-Central monitoring for all **private** automationbot-art cron repos.
+Central monitoring for automationbot-art cron repos.
 
-## Fix `repository not found` (private repos)
+**GitHub repo:** [automationbot-art/github-monitors](https://github.com/automationbot-art/github-monitors)
 
-**[docs/SECRETS-AND-PRIVATE-REPOS.md](docs/SECRETS-AND-PRIVATE-REPOS.md)** — read this first.
+## Which workflows to run?
 
-**Quick fix:** make **only** this repo **public** (cron repos stay private). Or enable org Actions access to this private repo.
+**[docs/WHICH-WORKFLOWS-TO-RUN.md](docs/WHICH-WORKFLOWS-TO-RUN.md)**
+
+| Repo | What to run |
+| --- | --- |
+| **github-monitors** (this repo) | Setup BigQuery (once) → Monitor Self Test (optional) |
+| **livestore_data_web** (cron repo) | **daily-warehouse** — your real workflow |
 
 ## Secret (org, once)
 
-| Secret | Value |
-| --- | --- |
-| **`LIVESTORE_SA_JSON`** | Full service account JSON (`config/livestore.json`) |
+`LIVESTORE_SA_JSON` — full service account JSON
 
-Add at **automationbot-art** → Settings → Secrets → Actions → all repos.
+## Action path for cron repos
 
-## Where data lives
-
-```
-combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events
+```yaml
+uses: automationbot-art/github-monitors/.github/actions/workflow-monitor@main
 ```
 
-## Cron repo integration
+## Central BigQuery table
 
-- [docs/INTEGRATE-EVERY-REPO.md](docs/INTEGRATE-EVERY-REPO.md)
-- [docs/DO-NOT-CREATE-TABLES.md](docs/DO-NOT-CREATE-TABLES.md)
+`combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events`
 
-## Repo layout (single copy of code)
+## Docs
 
-| Path | Purpose |
-| --- | --- |
-| `.github/actions/workflow-monitor/` | Composite action + scripts (used by all cron repos) |
-| `config/livestore.json` | Local credentials only (gitignored) |
-| `docs/` | All documentation |
-
-No duplicate `scripts/` at repo root — runtime code lives only inside the action folder.
+- [SECRETS-AND-PRIVATE-REPOS.md](docs/SECRETS-AND-PRIVATE-REPOS.md)
+- [INTEGRATE-EVERY-REPO.md](docs/INTEGRATE-EVERY-REPO.md)

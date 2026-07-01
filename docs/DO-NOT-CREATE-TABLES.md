@@ -10,4 +10,4 @@ Cron repos may **only** edit `.github/workflows/*.yml` and add the remote `Workf
 
 **Never** copy `setup_bigquery.py`, `config/bigquery.json`, or create repo-named tables.
 
-Setup runs once in **automationbot-art/github-monitor** only.
+Setup runs once in **automationbot-art/github-monitors** only.

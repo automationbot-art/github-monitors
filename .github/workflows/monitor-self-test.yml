@@ -1,5 +1,5 @@
 # =============================================================================
-# Self-test workflow for github-monitor (summary + BigQuery insert)
+# Self-test workflow for github-monitors (summary + BigQuery insert)
 # =============================================================================
 
 name: Monitor Self Test

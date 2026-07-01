@@ -1,4 +1,4 @@
-# Setup (github-monitor repo only)
+# Setup (github-monitors repo only)
 
 ## 1. Org secret
 
@@ -8,7 +8,7 @@
 
 ## 2. Private repo access
 
-Cron repos must resolve `automationbot-art/github-monitor`. See [SECRETS-AND-PRIVATE-REPOS.md](SECRETS-AND-PRIVATE-REPOS.md).
+Cron repos must resolve `automationbot-art/github-monitors`. See [SECRETS-AND-PRIVATE-REPOS.md](SECRETS-AND-PRIVATE-REPOS.md).
 
 ## 3. Provision BigQuery (this repo only)
 

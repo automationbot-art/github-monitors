@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Create BigQuery dataset and workflow_run_events table for Looker Studio.
 
-⛔ RUN ONLY in automationbot-art/github-monitor.
+⛔ RUN ONLY in automationbot-art/github-monitors.
    Cron repos must NOT run this — they insert rows via the workflow-monitor action.
 """
 

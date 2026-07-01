@@ -38,7 +38,7 @@ jobs:
 
       - name: Workflow monitor
         if: always()
-        uses: automationbot-art/github-monitor/.github/actions/workflow-monitor@main
+        uses: automationbot-art/github-monitors/.github/actions/workflow-monitor@main
         with:
           gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
           workflow-status: ${{ steps.cron.outcome }}

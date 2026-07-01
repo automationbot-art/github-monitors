@@ -1,6 +1,6 @@
 ---
 name: bigquery-looker-dashboard
-description: Query the SINGLE central BigQuery table for Looker Studio. setup_bigquery.py runs ONLY in automationbot-art/github-monitor — never in cron repos.
+description: Query the SINGLE central BigQuery table for Looker Studio. setup_bigquery.py runs ONLY in automationbot-art/github-monitors — never in cron repos.
 ---
 
 # BigQuery + Looker Studio Monitoring
@@ -22,9 +22,9 @@ Cron repos **do not** create tables. They only call the monitor action which **i
 | Table | `workflow_run_events` |
 | Looker filter | `repository_name` column |
 
-## Provision dataset + table (github-monitor repo ONLY)
+## Provision dataset + table (github-monitors repo ONLY)
 
-Run **only** in `automationbot-art/github-monitor` — never in cron repos:
+Run **only** in `automationbot-art/github-monitors` — never in cron repos:
 
 ```bash
 pip install -r requirements.txt

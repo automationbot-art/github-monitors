@@ -47,7 +47,7 @@ Leave commented `# schedule:` and `workflow_dispatch` **unchanged**.
 ```yaml
       - name: Workflow monitor
         if: always()
-        uses: automationbot-art/github-monitor/.github/actions/workflow-monitor@main
+        uses: automationbot-art/github-monitors/.github/actions/workflow-monitor@main
         with:
           gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
           workflow-status: ${{ steps.cron.outcome }}
@@ -66,7 +66,7 @@ Omit `schedule-status` if active cron. Omit entire block duplication — one mon
 ```
 YAML ONLY. One table: combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events
 No BigQuery scripts/tables in this repo. Do not change schedule lines.
-uses: automationbot-art/github-monitor/.github/actions/workflow-monitor@main
+uses: automationbot-art/github-monitors/.github/actions/workflow-monitor@main
 gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
 schedule-status: manual-only if cron commented.
 ```

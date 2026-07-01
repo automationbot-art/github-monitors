@@ -1,15 +1,15 @@
 ---
 name: github-workflow-monitor
-description: Integrate automationbot-art/github-monitor into cron workflow YAML ONLY. All repos write to ONE central BigQuery table. Never create per-repo tables or copy setup scripts.
+description: Integrate automationbot-art/github-monitors into cron workflow YAML ONLY. All repos write to ONE central BigQuery table. Never create per-repo tables or copy setup scripts.
 ---
 
 # GitHub Workflow Monitor Integration
 
 ## Private repos — fix `repository not found` first
 
-See `docs/SECRETS-AND-PRIVATE-REPOS.md` in github-monitor.
+See `docs/SECRETS-AND-PRIVATE-REPOS.md` in github-monitors.
 
-Make **github-monitor** public (recommended) OR enable org Actions access to that private repo.
+Make **github-monitors** public (recommended) OR enable org Actions access to that private repo.
 
 ## One central table
 
@@ -51,7 +51,7 @@ Leave commented cron and `workflow_dispatch` exactly as they are.
 ```yaml
 - name: Workflow monitor
   if: always()
-  uses: automationbot-art/github-monitor/.github/actions/workflow-monitor@main
+  uses: automationbot-art/github-monitors/.github/actions/workflow-monitor@main
   with:
     gcp-credentials-json: ${{ secrets.LIVESTORE_SA_JSON }}
     workflow-status: ${{ steps.cron.outcome }}
