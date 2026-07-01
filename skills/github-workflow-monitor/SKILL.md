@@ -5,15 +5,17 @@ description: Integrate automationbot-art/github-monitor into cron workflow YAML 
 
 # GitHub Workflow Monitor Integration
 
-## ⛔ ONE central table — not per repo
+## Private repos — fix `repository not found` first
+
+See `docs/SECRETS-AND-PRIVATE-REPOS.md` in github-monitor.
+
+Make **github-monitor** public (recommended) OR enable org Actions access to that private repo.
 
 ```
 combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events
 ```
 
-Every repository inserts **rows** here. Use column `repository_name` to filter by repo in Looker.
-
-**Never** in cron repos:
+## ⛔ ONE central table — not per repo
 - Create BigQuery datasets/tables
 - Copy `setup_bigquery.py` or `config/bigquery.json`
 - Add BigQuery setup workflows

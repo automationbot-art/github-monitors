@@ -1,32 +1,38 @@
 # github-monitor
 
-Central monitoring for **all** automationbot-art cron repos.
+Central monitoring for all **private** automationbot-art cron repos.
 
-## Where data lives (one place)
+## Fix `repository not found` (private repos)
+
+**[docs/SECRETS-AND-PRIVATE-REPOS.md](docs/SECRETS-AND-PRIVATE-REPOS.md)** — read this first.
+
+**Quick fix:** make **only** this repo **public** (cron repos stay private). Or enable org Actions access to this private repo.
+
+## Secret (org, once)
+
+| Secret | Value |
+| --- | --- |
+| **`LIVESTORE_SA_JSON`** | Full service account JSON (`config/livestore.json`) |
+
+Add at **automationbot-art** → Settings → Secrets → Actions → all repos.
+
+## Where data lives
 
 ```
 combine-data-pipeline-482809.github_cron_monitoring.workflow_run_events
 ```
 
-| | |
-|---|---|
-| **All repos** | Insert rows into this **one table** |
-| **Looker Studio** | Connect to this table, filter by `repository_name` |
-| **Cron repos** | YAML changes only — **no** local BigQuery setup |
-
 ## Cron repo integration
 
-**[docs/INTEGRATE-EVERY-REPO.md](docs/INTEGRATE-EVERY-REPO.md)** — what to paste in each repo
+- [docs/INTEGRATE-EVERY-REPO.md](docs/INTEGRATE-EVERY-REPO.md)
+- [docs/DO-NOT-CREATE-TABLES.md](docs/DO-NOT-CREATE-TABLES.md)
 
-**[docs/DO-NOT-CREATE-TABLES.md](docs/DO-NOT-CREATE-TABLES.md)** — stop per-repo table creation
+## Repo layout (single copy of code)
 
-## Org secret (once)
+| Path | Purpose |
+| --- | --- |
+| `.github/actions/workflow-monitor/` | Composite action + scripts (used by all cron repos) |
+| `config/livestore.json` | Local credentials only (gitignored) |
+| `docs/` | All documentation |
 
-`LIVESTORE_SA_JSON` on **automationbot-art** org
-
-## Docs
-
-- [docs/bigquery.md](docs/bigquery.md) — columns (PKT, manual/scheduled)
-- [skills/](skills/) — Cursor agent skills
-
-**Repo:** [automationbot-art/github-monitor](https://github.com/automationbot-art/github-monitor)
+No duplicate `scripts/` at repo root — runtime code lives only inside the action folder.

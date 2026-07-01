@@ -39,6 +39,6 @@ jobs:
 
       - name: Create dataset and table
         run: |
-          python scripts/setup_bigquery.py \
-            --config config/bigquery.json \
+          python .github/actions/workflow-monitor/scripts/setup_bigquery.py \
+            --config .github/actions/workflow-monitor/config/bigquery.json \
             --credentials "${GOOGLE_APPLICATION_CREDENTIALS}"
